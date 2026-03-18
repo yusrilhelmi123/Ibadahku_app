@@ -61,10 +61,35 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MotivasiApp() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sharedPreferences = context.getSharedPreferences("MotivasiAppPrefs", android.content.Context.MODE_PRIVATE)
+
     var currentTab by remember { mutableStateOf(TabType.HOME) }
-    var completedActivities by remember { mutableStateOf(setOf<Int>()) }
-    var completedSholat by remember { mutableStateOf(setOf<Int>()) }
-    var lastTrackedDate by remember { mutableStateOf(LocalDate.now()) }
+    
+    // Read from SharedPreferences
+    var completedActivities by remember { 
+        val saved = sharedPreferences.getStringSet("completedActivities", emptySet()) ?: emptySet()
+        mutableStateOf(saved.mapNotNull { it.toIntOrNull() }.toSet()) 
+    }
+    
+    var completedSholat by remember { 
+        val saved = sharedPreferences.getStringSet("completedSholat", emptySet()) ?: emptySet()
+        mutableStateOf(saved.mapNotNull { it.toIntOrNull() }.toSet()) 
+    }
+    
+    var lastTrackedDate by remember { 
+        val saved = sharedPreferences.getString("lastTrackedDate", LocalDate.now().toString())
+        mutableStateOf(LocalDate.parse(saved))
+    }
+    
+    // Auto-save inputan jika berubah
+    LaunchedEffect(completedActivities, completedSholat, lastTrackedDate) {
+        sharedPreferences.edit()
+            .putStringSet("completedActivities", completedActivities.map { it.toString() }.toSet())
+            .putStringSet("completedSholat", completedSholat.map { it.toString() }.toSet())
+            .putString("lastTrackedDate", lastTrackedDate.toString())
+            .apply()
+    }
     
     // Auto-clear inputan jika berubah hari
     LaunchedEffect(Unit) {
@@ -355,14 +380,28 @@ fun HomeScreen(
         )
     )
     
-    // Jadwal 5 waktu sholat
-    val sholatTimes = listOf(
-        SholatItem(id = 1, name = "Subuh", time = "04:30", color = Color(0xFF1F41BB), icon = "🌙"),
-        SholatItem(id = 2, name = "Dzuhur", time = "12:00", color = Color(0xFFFFC107), icon = "☀️"),
-        SholatItem(id = 3, name = "Ashar", time = "15:00", color = Color(0xFFFF9800), icon = "🌤"),
-        SholatItem(id = 4, name = "Maghrib", time = "18:00", color = Color(0xFFE91E63), icon = "🌅"),
-        SholatItem(id = 5, name = "Isya", time = "19:30", color = Color(0xFF673AB7), icon = "🌙")
-    )
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sharedPreferences = context.getSharedPreferences("MotivasiAppPrefs", android.content.Context.MODE_PRIVATE)
+
+    var sholatTimes by remember {
+        mutableStateOf(
+            listOf(
+                SholatItem(id = 1, name = "Subuh", time = sharedPreferences.getString("time_1", "04:30") ?: "04:30", color = Color(0xFF1F41BB), icon = "🌙"),
+                SholatItem(id = 2, name = "Dzuhur", time = sharedPreferences.getString("time_2", "12:00") ?: "12:00", color = Color(0xFFFFC107), icon = "☀️"),
+                SholatItem(id = 3, name = "Ashar", time = sharedPreferences.getString("time_3", "15:00") ?: "15:00", color = Color(0xFFFF9800), icon = "🌤"),
+                SholatItem(id = 4, name = "Maghrib", time = sharedPreferences.getString("time_4", "18:00") ?: "18:00", color = Color(0xFFE91E63), icon = "🌅"),
+                SholatItem(id = 5, name = "Isya", time = sharedPreferences.getString("time_5", "19:30") ?: "19:30", color = Color(0xFF673AB7), icon = "🌙")
+            )
+        )
+    }
+
+    LaunchedEffect(sholatTimes) {
+        val editor = sharedPreferences.edit()
+        sholatTimes.forEach {
+            editor.putString("time_${it.id}", it.time)
+        }
+        editor.apply()
+    }
 
     Column(
         modifier = Modifier
@@ -443,6 +482,11 @@ fun HomeScreen(
                                 completedSholat - sholat.id
                             }
                         )
+                    },
+                    onTimeChange = { newTime ->
+                        sholatTimes = sholatTimes.map { 
+                            if (it.id == sholat.id) it.copy(time = newTime) else it 
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1214,8 +1258,23 @@ fun SholatCard(
     sholat: SholatItem,
     isCompleted: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    onTimeChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val calendar = java.util.Calendar.getInstance()
+    
+    val timePickerDialog = android.app.TimePickerDialog(
+        context,
+        { _, hourOfDay, minute ->
+            val formattedTime = String.format("%02d:%02d", hourOfDay, minute)
+            onTimeChange(formattedTime)
+        },
+        calendar.get(java.util.Calendar.HOUR_OF_DAY),
+        calendar.get(java.util.Calendar.MINUTE),
+        true
+    )
+
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
@@ -1263,13 +1322,25 @@ fun SholatCard(
                         fontSize = 13.sp
                     )
 
-                    Text(
-                        text = sholat.time,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF999999),
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .clickable { timePickerDialog.show() }
+                            .padding(top = 2.dp, bottom = 2.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = sholat.time,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF1F41BB),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = " ✎",
+                            color = Color(0xFF1F41BB),
+                            fontSize = 10.sp
+                        )
+                    }
                 }
             }
         }
