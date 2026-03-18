@@ -1,0 +1,45 @@
+# Gradle files
+.gradle/
+build/
+*.apk
+*.ap_
+*.ap
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Generated files
+bin/
+gen/
+
+# Idea files
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build files
+out/
+.env
+.vscode/
+
+# Android Studio specific files
+*.class
+*.log
+*.ctxt
+
+# Kotlin
+out/
+*.jar
+*.zip
+
+# Project specific
+/keystore/
+secrets.gradle
+
+# Heap Dumps
+*.hprof

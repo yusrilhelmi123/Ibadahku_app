@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors -->
+    <color name="primary">#1F41BB</color>
+    <color name="primary_variant">#1B33A0</color>
+    <color name="primary_light">#E8EFFE</color>
+    
+    <!-- Secondary Colors -->
+    <color name="secondary">#FF6B6B</color>
+    <color name="secondary_variant">#E55555</color>
+    
+    <!-- Neutral Colors -->
+    <color name="background">#FFFFFF</color>
+    <color name="surface">#F5F5F5</color>
+    <color name="surface_dark">#E8E8E8</color>
+    <color name="text_primary">#1F1F1F</color>
+    <color name="text_secondary">#666666</color>
+    <color name="text_light">#999999</color>
+    <color name="divider">#EEEEEE</color>
+    
+    <!-- Status Colors -->
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FFC107</color>
+    <color name="error">#F44336</color>
+    
+    <!-- Activity Colors -->
+    <color name="prayer_blue">#1F41BB</color>
+    <color name="dzikir_purple">#9C27B0</color>
+    <color name="quran_green">#4CAF50</color>
+    <color name="doa_orange">#FF9800</color>
+</resources>

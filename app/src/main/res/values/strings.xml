@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MotivasiApp</string>
+    
+    <!-- Main Screen -->
+    <string name="title_improve_relationship">Perbaiki Hubunganmu\nDengan Allah</string>
+    <string name="subtitle_main">Kalau dunia yang kamu rapikan, tapi hati tetap kosong, kamu akan tetap gelisah.</string>
+    
+    <!-- Activities Section -->
+    <string name="section_activities">Lakukan Hal Ini</string>
+    <string name="activity_prayer">Shalat Tepat Waktu</string>
+    <string name="activity_dzikir">Dzikir Pagi &amp; Petang</string>
+    <string name="activity_quran">1 Halaman Al-Qur\'an Setiap Hari</string>
+    <string name="activity_doa">5 Menit Doa yang Jujur</string>
+    
+    <!-- Bottom Quote -->
+    <string name="quote_disciplin">Disiplin bukan cuma soal produktif. Tapi soal taat, dan punya tempat untuk hati ini pulang.</string>
+    
+    <!-- Tracking -->
+    <string name="today">Hari Ini</string>
+    <string name="completed">Selesai</string>
+    <string name="not_completed">Belum Selesai</string>
+    <string name="track_progress">Lacak Progres Anda</string>
+    <string name="weekly_report">Laporan Mingguan</string>
+</resources>
