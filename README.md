@@ -236,7 +236,7 @@ Project ini dilisensikan di bawah MIT License - lihat file LICENSE untuk details
 ## Contact & Support
 
 Untuk pertanyaan atau support:
-- Email: support@motivasiapp.com
+- Email: yusrilhelmi@gmail.com
 - GitHub Issues: [Report Issues](https://github.com/motivasiapp/issues)
 
 ---
