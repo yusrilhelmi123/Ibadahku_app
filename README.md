@@ -5,10 +5,10 @@ Aplikasi Android untuk membantu meningkatkan hubungan dengan Allah melalui track
 ## Fitur Utama
 
 ### 1. **Tracking Aktivitas Harian**
-   - 📌 Shalat Tepat Waktu
-   - 📿 Dzikir Pagi & Petang
-   - 📖 1 Halaman Al-Qur'an Setiap Hari
-   - 🤲 5 Menit Doa yang Jujur
+   -  Shalat Tepat Waktu
+   -  Dzikir Pagi & Petang
+   -  1 Halaman Al-Qur'an Setiap Hari
+   -  5 Menit Doa yang Jujur
 
 ### 2. **Progress Tracker**
    - Visualisasi progres harian dalam bentuk progress bar
