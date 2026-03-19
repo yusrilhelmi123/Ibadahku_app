@@ -3,6 +3,8 @@
 
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -32,6 +34,17 @@
             android:permission="android.permission.SCHEDULE_EXACT_ALARM">
             <intent-filter>
                 <action android:name="com.apps.motivasiapp.SHOLAT_ALARM" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Fix #2: Boot Receiver - reschedule alarm setelah HP restart -->
+        <receiver
+            android:name=".receiver.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- Untuk Xiaomi/MIUI dan beberapa vendor lain -->
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
     </application>

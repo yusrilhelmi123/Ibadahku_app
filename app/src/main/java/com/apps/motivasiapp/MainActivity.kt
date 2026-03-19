@@ -3,20 +3,32 @@ package com.apps.motivasiapp
 import android.Manifest
 import android.os.Bundle
 import android.os.Build
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -25,8 +37,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.apps.motivasiapp.utils.NotificationManager
 import kotlinx.coroutines.delay
 import java.time.LocalDate
@@ -82,7 +96,7 @@ fun MotivasiApp() {
         mutableStateOf(LocalDate.parse(saved))
     }
     
-    // Auto-save inputan jika berubah
+    // Auto-save inputan sementara jika berubah
     LaunchedEffect(completedActivities, completedSholat, lastTrackedDate) {
         sharedPreferences.edit()
             .putStringSet("completedActivities", completedActivities.map { it.toString() }.toSet())
@@ -114,6 +128,16 @@ fun MotivasiApp() {
             completedActivities - 1
         }
     }
+
+    // Fungsi simpan progres harian ke per-tanggal
+    val saveDailyProgress: () -> Unit = {
+        val today = LocalDate.now().toString()
+        sharedPreferences.edit()
+            .putStringSet("daily_${today}_activities", completedActivities.map { it.toString() }.toSet())
+            .putStringSet("daily_${today}_sholat", completedSholat.map { it.toString() }.toSet())
+            .putBoolean("daily_${today}_saved", true)
+            .apply()
+    }
     
     Column(
         modifier = Modifier.fillMaxSize()
@@ -129,16 +153,19 @@ fun MotivasiApp() {
                     completedActivities = completedActivities,
                     onActivitiesChange = { completedActivities = it },
                     completedSholat = completedSholat,
-                    onSholatChange = { completedSholat = it }
+                    onSholatChange = { completedSholat = it },
+                    onSaveProgress = saveDailyProgress
                 )
                 TabType.SUMMARY -> SummaryScreen(
                     completedActivities = completedActivities,
                     completedSholat = completedSholat,
+                    sharedPreferences = sharedPreferences,
                     onReset = {
                         completedActivities = emptySet()
                         completedSholat = emptySet()
                     }
                 )
+                TabType.QURAN -> QuranScreen()
                 TabType.ABOUT -> AboutScreen()
             }
         }
@@ -153,7 +180,7 @@ fun MotivasiApp() {
 }
 
 enum class TabType {
-    HOME, SUMMARY, ABOUT
+    HOME, SUMMARY, QURAN, ABOUT
 }
 
 // Helper function untuk menampilkan bulan dan tahun
@@ -203,28 +230,55 @@ fun getCurrentDateDisplay(): String {
 // Helper function untuk menghitung statistik mingguan real
 data class WeeklyData(
     val day: String,
-    val percentage: Int
+    val percentage: Int,
+    val isSaved: Boolean = false
 )
 
 fun calculateWeeklyStatistics(
     completedActivities: Set<Int>,
-    completedSholat: Set<Int>
+    completedSholat: Set<Int>,
+    sharedPreferences: android.content.SharedPreferences? = null
 ): List<WeeklyData> {
-    val totalActivities = 9 // 4 main activities + 5 sholat
-    val totalCompleted = completedActivities.size + completedSholat.size
-    val completionPercentage = (totalCompleted * 100) / totalActivities
-    
+    val totalActivities = 9 // 4 main + 5 sholat
     val weekDays = listOf("Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab")
-    val basePercentage = minOf(completionPercentage, 100)
     
-    // Get current day of week. LocalDate.dayOfWeek.value is 1 (Monday) to 7 (Sunday)
-    val todayValue = java.time.LocalDate.now().dayOfWeek.value
-    // Convert to index: Sunday=0, Monday=1, ..., Saturday=6
-    val todayIndex = if (todayValue == 7) 0 else todayValue
+    val today = java.time.LocalDate.now()
+    // Get Monday as start of week
+    val dayOfWeek = today.dayOfWeek.value // 1=Mon ... 7=Sun
+    val weekStart = today.minusDays((dayOfWeek - 1).toLong()) // Monday
     
     return weekDays.mapIndexed { index, day ->
-        val percentage = if (index == todayIndex) basePercentage else 0
-        WeeklyData(day, percentage)
+        // index 0=Sun, 1=Mon, ..., 6=Sat (tampilan)
+        // Hitung tanggal: weekStart adalah Mon (index 1)
+        val offset = if (index == 0) 6L else (index - 1).toLong()
+        val dateForDay = weekStart.plusDays(offset)
+        val dateStr = dateForDay.toString()
+        
+        val isToday = dateForDay == today
+        // Cek apakah hari ini index weekday
+        val todayValue = today.dayOfWeek.value
+        val todayIndex = if (todayValue == 7) 0 else todayValue
+        val isCurrentDay = index == todayIndex
+        
+        val isSaved = sharedPreferences?.getBoolean("daily_${dateStr}_saved", false) ?: false
+        
+        val percentage = when {
+            isSaved -> {
+                // Baca data tersimpan untuk hari tersebut
+                val savedActivities = sharedPreferences?.getStringSet("daily_${dateStr}_activities", emptySet()) ?: emptySet()
+                val savedSholat = sharedPreferences?.getStringSet("daily_${dateStr}_sholat", emptySet()) ?: emptySet()
+                val totalCompleted = savedActivities.size + savedSholat.size
+                minOf((totalCompleted * 100) / totalActivities, 100)
+            }
+            isCurrentDay -> {
+                // Hari ini: gunakan data current (belum disimpan)
+                val totalCompleted = completedActivities.size + completedSholat.size
+                minOf((totalCompleted * 100) / totalActivities, 100)
+            }
+            else -> 0
+        }
+        
+        WeeklyData(day, percentage, isSaved || isCurrentDay)
     }
 }
 
@@ -306,6 +360,16 @@ fun TabBar(
         )
         
         TabBarItem(
+            label = "Al-Qur'an",
+            icon = "📖",
+            isSelected = currentTab == TabType.QURAN,
+            onClick = { onTabSelected(TabType.QURAN) },
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+        )
+        
+        TabBarItem(
             label = "Tentang",
             icon = "ℹ️",
             isSelected = currentTab == TabType.ABOUT,
@@ -351,7 +415,8 @@ fun HomeScreen(
     completedActivities: Set<Int>,
     onActivitiesChange: (Set<Int>) -> Unit,
     completedSholat: Set<Int>,
-    onSholatChange: (Set<Int>) -> Unit
+    onSholatChange: (Set<Int>) -> Unit,
+    onSaveProgress: () -> Unit = {}
 ) {
     val activities = listOf(
         ActivityItem(
@@ -487,6 +552,19 @@ fun HomeScreen(
                         sholatTimes = sholatTimes.map { 
                             if (it.id == sholat.id) it.copy(time = newTime) else it 
                         }
+                        // Fix #1: Reschedule alarm sesuai waktu baru yang diset user
+                        val parts = newTime.split(":")
+                        val hour = parts.getOrNull(0)?.toIntOrNull()
+                        val minute = parts.getOrNull(1)?.toIntOrNull()
+                        if (hour != null && minute != null) {
+                            com.apps.motivasiapp.utils.NotificationManager.scheduleSingleSholatNotification(
+                                context = context,
+                                requestCode = sholat.id - 1, // id 1-5 → requestCode 0-4
+                                name = sholat.name,
+                                hour = hour,
+                                minute = minute
+                            )
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -610,6 +688,69 @@ fun HomeScreen(
             }
         }
 
+        // ===== TOMBOL SIMPAN PROGRES =====
+        var showSaveSuccess by remember { mutableStateOf(false) }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+        ) {
+            Button(
+                onClick = {
+                    onSaveProgress()
+                    showSaveSuccess = true
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1F41BB)
+                ),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text(
+                    text = "💾  Simpan Progres Hari Ini",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        }
+
+        // Notifikasi sukses simpan
+        AnimatedVisibility(
+            visible = showSaveSuccess,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 4.dp)
+        ) {
+            LaunchedEffect(showSaveSuccess) {
+                if (showSaveSuccess) {
+                    delay(2500)
+                    showSaveSuccess = false
+                }
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF4CAF50)),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(
+                    text = "✅ Progres berhasil disimpan!",
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp, horizontal = 16.dp)
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
     }
 }
@@ -618,6 +759,7 @@ fun HomeScreen(
 fun SummaryScreen(
     completedActivities: Set<Int>,
     completedSholat: Set<Int>,
+    sharedPreferences: android.content.SharedPreferences? = null,
     onReset: () -> Unit = {}
 ) {
     var showResetDialog by remember { mutableStateOf(false) }
@@ -763,7 +905,7 @@ fun SummaryScreen(
                         .padding(16.dp)
                 ) {
                     // Calculate real weekly statistics
-                    val weeklyData = calculateWeeklyStatistics(completedActivities, completedSholat)
+                    val weeklyData = calculateWeeklyStatistics(completedActivities, completedSholat, sharedPreferences)
                     val maxValue = weeklyData.maxOfOrNull { it.percentage } ?: 100
                     
                     Row(
@@ -791,10 +933,18 @@ fun SummaryScreen(
                                 )
                                 
                                 // Bar with height based on percentage
-                                val barHeight = if (maxValue > 0) {
+                                val barHeight = if (maxValue > 0 && data.percentage > 0) {
                                     ((data.percentage.toFloat() / maxValue.toFloat()) * 150).toInt().dp
                                 } else {
-                                    10.dp
+                                    8.dp
+                                }
+
+                                val barColor = when {
+                                    !data.isSaved -> Color(0xFFE0E0E0) // Abu-abu: belum ada data
+                                    data.percentage >= 80 -> Color(0xFF4CAF50)
+                                    data.percentage >= 60 -> Color(0xFFFFC107)
+                                    data.percentage >= 40 -> Color(0xFFFF9800)
+                                    else -> Color(0xFFE53935)
                                 }
                                 
                                 Box(
@@ -802,12 +952,7 @@ fun SummaryScreen(
                                         .width(20.dp)
                                         .height(barHeight)
                                         .background(
-                                            color = when {
-                                                data.percentage >= 80 -> Color(0xFF4CAF50)
-                                                data.percentage >= 60 -> Color(0xFFFFC107)
-                                                data.percentage >= 40 -> Color(0xFFFF9800)
-                                                else -> Color(0xFFE53935)
-                                            },
+                                            color = barColor,
                                             shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
                                         )
                                 )
@@ -917,6 +1062,24 @@ fun SummaryScreen(
                                 )
                                 Text(
                                     text = "<40%",
+                                    fontSize = 9.sp,
+                                    color = Color(0xFF666666)
+                                )
+                            }
+
+                            // Gray legend
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .background(Color(0xFFE0E0E0), RoundedCornerShape(2.dp))
+                                )
+                                Text(
+                                    text = "Belum disimpan",
                                     fontSize = 9.sp,
                                     color = Color(0xFF666666)
                                 )
@@ -1495,5 +1658,54 @@ fun AboutScreen() {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun QuranScreen() {
+    var webView by remember { mutableStateOf<WebView?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    BackHandler(enabled = webView?.canGoBack() == true) {
+        webView?.goBack()
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (isLoading) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFF1F41BB)
+            )
+        }
+        
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { context ->
+                WebView(context).apply {
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            isLoading = false
+                        }
+                    }
+                    webChromeClient = WebChromeClient()
+                    
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        loadWithOverviewMode = true
+                        useWideViewPort = true
+                        builtInZoomControls = true
+                        displayZoomControls = false
+                    }
+                    
+                    loadUrl("https://quran.kemenag.go.id/")
+                    webView = this
+                }
+            },
+            update = {
+                webView = it
+            }
+        )
     }
 }

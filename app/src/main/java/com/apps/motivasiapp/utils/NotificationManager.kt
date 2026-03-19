@@ -26,6 +26,39 @@ object NotificationManager {
             scheduleSholatNotification(context, alarmManager, sholatTime, index)
         }
     }
+
+    /**
+     * Fix #1: Jadwalkan ulang satu alarm sholat saat user mengubah waktunya di UI.
+     * requestCode = sholat.id - 1 (0=Subuh, 1=Dzuhur, ..., 4=Isya)
+     */
+    fun scheduleSingleSholatNotification(
+        context: Context,
+        requestCode: Int,
+        name: String,
+        hour: Int,
+        minute: Int
+    ) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        scheduleSholatNotification(context, alarmManager, SholatTime(name, hour, minute), requestCode)
+    }
+
+    /**
+     * Fix #2: Jadwalkan ulang semua alarm dengan waktu kustom.
+     * Digunakan oleh BootReceiver setelah HP restart.
+     * customTimes = list of Triple(requestCode, name, "HH:mm")
+     */
+    fun scheduleAllSholatWithCustomTimes(
+        context: Context,
+        customTimes: List<Triple<Int, String, String>>
+    ) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        customTimes.forEach { (requestCode, name, timeStr) ->
+            val parts = timeStr.split(":")
+            val hour = parts.getOrNull(0)?.toIntOrNull() ?: return@forEach
+            val minute = parts.getOrNull(1)?.toIntOrNull() ?: return@forEach
+            scheduleSholatNotification(context, alarmManager, SholatTime(name, hour, minute), requestCode)
+        }
+    }
     
     private fun scheduleSholatNotification(
         context: Context,
